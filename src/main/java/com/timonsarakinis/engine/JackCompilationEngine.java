@@ -4,14 +4,14 @@ import com.timonsarakinis.tokenizer.Tokenizer;
 import com.timonsarakinis.tokens.NonTerminalToken;
 import com.timonsarakinis.tokens.Token;
 import com.timonsarakinis.tokens.types.*;
+import com.timonsarakinis.utils.EngineUtils;
 import com.timonsarakinis.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import static com.timonsarakinis.tokens.types.KeywordType.*;
 import static com.timonsarakinis.tokens.types.NonTerminalType.*;
 import static com.timonsarakinis.tokens.types.SymbolType.*;
-import static com.timonsarakinis.utils.EngineUtils.isIdentifier;
-import static com.timonsarakinis.utils.EngineUtils.isType;
+import static com.timonsarakinis.utils.EngineUtils.*;
 import static com.timonsarakinis.utils.TokenUtils.prepareNonTerminalForOutPut;
 import static com.timonsarakinis.utils.TokenUtils.prepareTerminalForOutPut;
 import static org.apache.commons.lang3.EnumUtils.getEnumIgnoreCase;
@@ -42,25 +42,15 @@ public class JackCompilationEngine implements Engine {
         eatAndAdvance(isIdentifier(getCurrentTokenValue()));
         eatAndAdvance(OPEN_BRACE.getCharacter());
 
-        while (isCurrentTokenClassVar()) {
+        while (EngineUtils.isCurrentTokenClassVar(getCurrentTokenValue())) {
             compileClassVarDeclaration();
         }
 
-        while (isCurrentTokenSubroutine()) {
+        while (EngineUtils.isCurrentTokenSubroutine(getCurrentTokenValue())) {
             compileSubroutineDeclaration();
         }
         eatAndAdvance(CLOSE_BRACE.getCharacter());
         writeNonTerminalToFile(NonTerminalType.CLASS, false);
-    }
-
-    private boolean isCurrentTokenClassVar() {
-        return isCurrentTokenEqualTo(FIELD.getValue()) || isCurrentTokenEqualTo(STATIC.getValue());
-    }
-
-    private boolean isCurrentTokenSubroutine() {
-        return isCurrentTokenEqualTo(CONSTRUCTOR.getValue())
-                || isCurrentTokenEqualTo(FUNCTION.getValue())
-                || isCurrentTokenEqualTo(METHOD.getValue());
     }
 
     private void compileClassVarDeclaration() {
@@ -80,7 +70,7 @@ public class JackCompilationEngine implements Engine {
 
     private void compileSubroutineDeclaration() {
         writeNonTerminalToFile(SUBROUTINE_DEC, true);
-        eatAndAdvance(isCurrentTokenSubroutine());
+        eatAndAdvance(EngineUtils.isCurrentTokenSubroutine(getCurrentTokenValue()));
         eatAndAdvance(isType(getCurrentTokenValue()) || isCurrentTokenEqualTo(VOID.getValue()));
         eatAndAdvance(isIdentifier(getCurrentTokenValue()));
 
@@ -275,7 +265,7 @@ public class JackCompilationEngine implements Engine {
 
     private void compileTerm() {
         writeNonTerminalToFile(TERM, true);
-        eatAndAdvance(isTermConstant());
+        eatAndAdvance(isTermConstant(tokenizer.getCurrentToken()));
         if (isIdentifier(getCurrentTokenValue())) {
             lookAhead();
         } else if (isCurrentTokenEqualTo(OPEN_PARENTHESIS.getCharacter())) {
@@ -292,15 +282,6 @@ public class JackCompilationEngine implements Engine {
             eatAndAdvance(true);
             compileTerm();
         }
-    }
-
-    private boolean isTermConstant() {
-        return getCurrentTokenType() == TokenType.INT_CONST
-                || getCurrentTokenType() == TokenType.STRING_CONST
-                || isCurrentTokenEqualTo(THIS.getValue())
-                || isCurrentTokenEqualTo(NULL.getValue())
-                || isCurrentTokenEqualTo(TRUE.getValue())
-                || isCurrentTokenEqualTo(FALSE.getValue());
     }
 
     private void lookAhead() {
@@ -349,12 +330,12 @@ public class JackCompilationEngine implements Engine {
         }
     }
 
-    private void writeToFile(byte[] xml) {
-        IOUtils.writeToFile(xml, fileName);
-    }
-
     private void writeNonTerminalToFile(NonTerminalToken token, boolean open) {
         writeToFile(prepareNonTerminalForOutPut(token, open));
+    }
+
+    private void writeToFile(byte[] xml) {
+        IOUtils.writeToFile(xml, fileName);
     }
 
     private void printError(Token currentToken) {
@@ -366,9 +347,5 @@ public class JackCompilationEngine implements Engine {
 
     private String getCurrentTokenValue() {
         return tokenizer.getCurrentToken().getValue();
-    }
-
-    private TokenType getCurrentTokenType() {
-        return tokenizer.getCurrentToken().getTokenType();
     }
 }
