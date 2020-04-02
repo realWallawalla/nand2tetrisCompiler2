@@ -3,10 +3,10 @@ package com.timonsarakinis.symboltable;
 public class SymbolRow {
     private String name;
     private String type;
-    private VariableType kind;
+    private String kind;
     private int index;
 
-    public SymbolRow(String name, String type, VariableType kind, int index) {
+    public SymbolRow(String name, String type, String kind, int index) {
         this.name = name;
         this.type = type;
         this.kind = kind;
@@ -21,7 +21,7 @@ public class SymbolRow {
         return type;
     }
 
-    public VariableType getKind() {
+    public String getKind() {
         return kind;
     }
 

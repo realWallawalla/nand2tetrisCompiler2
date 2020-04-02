@@ -1,10 +1,10 @@
 package com.timonsarakinis.symboltable;
 
 
+import com.timonsarakinis.tokens.types.KeywordType;
+
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class SymbolTable implements Table {
     private HashMap<String, SymbolRow> classTable;
@@ -27,31 +27,26 @@ public class SymbolTable implements Table {
     }
 
     @Override
-    public void define(String name, String type, VariableType kind) {
-        switch (kind) {
-            case STATIC:
-                classTable.put(name, new SymbolRow(name, type, kind, staticCounter));
-                staticCounter++;
-                break;
-            case FIELD:
-                classTable.put(name, new SymbolRow(name, type, kind, fieldCounter));
-                fieldCounter++;
-                break;
-            case ARG:
-                functionTable.put(name, new SymbolRow(name, type, kind, argCounter));
-                argCounter++;
-                break;
-            case VAR:
-                functionTable.put(name, new SymbolRow(name, type, kind, varCounter));
-                varCounter++;
-                break;
+    public void define(String name, String type, String kind) {
+        if (kind.equals(KeywordType.STATIC.getValue())) {
+            classTable.put(name, new SymbolRow(name, type, kind, staticCounter));
+            staticCounter++;
+        } else if (kind.equals(KeywordType.FIELD.getValue())) {
+            classTable.put(name, new SymbolRow(name, type, kind, fieldCounter));
+            fieldCounter++;
+        } else if (kind.equals("arg")) {
+            functionTable.put(name, new SymbolRow(name, type, kind, argCounter));
+            argCounter++;
+        } else if (kind.equals(KeywordType.VAR.getValue())) {
+            functionTable.put(name, new SymbolRow(name, type, kind, varCounter));
+            varCounter++;
         }
     }
 
     @Override
-    public int varCount(VariableType kind) {
+    public int varCount(IdentifierType kind) {
         long varCount;
-        if (kind == VariableType.FIELD || kind == VariableType.STATIC) {
+        if (kind == IdentifierType.FIELD || kind == IdentifierType.STATIC) {
             varCount = getCount(kind, classTable.values());
         } else {
             varCount = getCount(kind, functionTable.values());
@@ -59,12 +54,12 @@ public class SymbolTable implements Table {
         return (int) varCount;
     }
 
-    private long getCount(VariableType kind, Collection<SymbolRow> rows) {
-        return rows.stream().filter(row -> row.getKind() == kind).count();
+    private long getCount(IdentifierType kind, Collection<SymbolRow> rows) {
+        return rows.stream().filter(row -> row.getKind().equals(kind)).count();
     }
 
     @Override
-    public VariableType kindOf(String key) {
+    public String kindOf(String key) {
         SymbolRow row = getSymbolRow(key);
         return row != null ? row.getKind() : null;
     }

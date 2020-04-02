@@ -2,6 +2,7 @@ package com.timonsarakinis.tokenizer;
 
 import com.timonsarakinis.factory.FactoryProvider;
 import com.timonsarakinis.factory.TokenFactory;
+import com.timonsarakinis.symboltable.SymbolTable;
 import com.timonsarakinis.tokens.Token;
 import com.timonsarakinis.tokens.types.TokenType;
 import com.timonsarakinis.utils.TokenUtils;
@@ -16,6 +17,7 @@ public class JackTokenizer implements Tokenizer {
      as specified by the Jack grammar */
     private ListIterator<String> iterator;
     private Token currentToken;
+    SymbolTable symbolTable = new SymbolTable();
 
     public JackTokenizer(List<String> tokens) {
         this.iterator = tokens.listIterator();

@@ -3,11 +3,11 @@ package com.timonsarakinis.symboltable;
 public interface Table {
     void startSubRoutine();
 
-    void define(String name, String type, VariableType kind);
+    void define(String name, String type, String kind);
 
-    int varCount(VariableType type);
+    int varCount(IdentifierType type);
 
-    VariableType kindOf(String key);
+    String kindOf(String key);
 
     String typeOf(String key);
 

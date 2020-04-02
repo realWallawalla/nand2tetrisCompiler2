@@ -80,22 +80,4 @@ public class TokenUtils {
             return IDENTIFIER.toString();
         }
     }
-
-    public static byte[] prepareTerminalForOutPut(Token token) {
-        String node = token.getTokenType().getNodeName();
-        String value = token.getValue();
-
-        return "<".concat(node).concat(">").concat(value).concat("</").concat(node).concat(">").concat("\n").getBytes(StandardCharsets.UTF_8);
-    }
-
-    public static byte[] prepareNonTerminalForOutPut(NonTerminalToken token, boolean open) {
-        String node = token.getNodeName();
-        String base = "";
-        if (open) {
-            base = "<".concat(node).concat(">");
-        } else {
-            base = ("</").concat(node).concat(">");
-        }
-        return base.concat("\n").getBytes(StandardCharsets.UTF_8);
-    }
 }

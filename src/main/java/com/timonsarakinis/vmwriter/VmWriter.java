@@ -1,9 +1,9 @@
 package com.timonsarakinis.vmwriter;
 
 public interface VmWriter {
-    void writePush(VmSegmentType segment, int index);
+    void writePush(VmSegmentType segment, int value);
 
-    void writePop(VmSegmentType segment, int index);
+    void writePop(VmSegmentType segment, int value);
 
     void writeArithmatic(ArithmeticType arithmetic);
 
