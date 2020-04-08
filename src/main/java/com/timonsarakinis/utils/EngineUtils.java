@@ -1,7 +1,5 @@
 package com.timonsarakinis.utils;
 
-import com.timonsarakinis.tokens.Token;
-import com.timonsarakinis.tokens.types.TokenType;
 import org.apache.commons.lang3.StringUtils;
 
 import static com.timonsarakinis.tokens.types.KeywordType.*;
@@ -18,10 +16,6 @@ public class EngineUtils {
 
     public static boolean isIdentifier(String token) {
         return token.matches(validIdentifier);
-    }
-
-    public static boolean isTermConstant(Token token) {
-        return token.getTokenType() == TokenType.INT_CONST || StringUtils.equals(token.getValue(), NULL.getValue());
     }
 
     public static boolean isCurrentTokenSubroutine(String token) {

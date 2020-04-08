@@ -5,6 +5,7 @@ import com.timonsarakinis.tokens.types.SymbolType;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -24,8 +25,9 @@ public class TokenUtils {
                 .map(line -> substringBefore(line, "//"))
                 .map(line -> {
                     if (line.contains("\"")) {
-                        String stringConstant = substringBetween(line, "\"", "\"");
-                        String placeHolder = stringConstant.replace(" ", PLACE_HOLDER);
+                        line = line.trim();
+                        String stringConstant = line.substring(line.indexOf("\""), line.lastIndexOf("\"") + 1);
+                        String placeHolder = " " + stringConstant.replace(" ", PLACE_HOLDER) + " ";
                         line = StringUtils.replace(line, stringConstant, placeHolder);
                     }
                     return line;
@@ -47,21 +49,26 @@ public class TokenUtils {
     }
 
     private static String addSpacesToSymbolsForSplit(String lines) {
-        return Stream.of(lines.split(" "))
-                .map(s -> s.replace(";", (" " + SEMICOLON.getCharacter()) + " "))
-                .map(s -> s.replace("&", (" " + AMPERSAND.getCharacter()) + " "))
-                .map(s -> s.replace(",", (" " + COMMA.getCharacter()) + " "))
-                .map(s -> s.replace("(", (" " + OPEN_PARENTHESIS.getCharacter()) + " "))
-                .map(s -> s.replace(")", (" " + CLOSE_PARENTHESIS.getCharacter()) + " "))
-                .map(s -> s.replace(".", (" " + DOT.getCharacter()) + " "))
-                .map(s -> s.replace("<", (" " + LESS_THAN.getCharacter()) + " "))
-                .map(s -> s.replace(">", (" " + GREATER_THAN.getCharacter()) + " "))
-                .map(s -> s.replace("-", (" " + SUB.getCharacter()) + " "))
-                .map(s -> s.replace("[", (" " + OPEN_BRACKET.getCharacter()) + " "))
-                .map(s -> s.replace("]", (" " + CLOSE_BRACKET.getCharacter()) + " "))
-                .map(s -> s.replace("~", (" " + TILDE.getCharacter()) + " "))
-                .map(String::trim)
-                .collect(joining(" "));
+        StringJoiner stringJoiner = new StringJoiner(" ");
+        for (String s : lines.split(" ")) {
+            if (!s.contains("\"")) {
+                s = s.replace(";", (" " + SEMICOLON.getCharacter()) + " ");
+                s = s.replace("&", (" " + AMPERSAND.getCharacter()) + " ");
+                s = s.replace(",", (" " + COMMA.getCharacter()) + " ");
+                s = s.replace("(", (" " + OPEN_PARENTHESIS.getCharacter()) + " ");
+                s = s.replace(")", (" " + CLOSE_PARENTHESIS.getCharacter()) + " ");
+                s = s.replace(".", (" " + DOT.getCharacter()) + " ");
+                s = s.replace("<", (" " + LESS_THAN.getCharacter()) + " ");
+                s = s.replace(">", (" " + GREATER_THAN.getCharacter()) + " ");
+                s = s.replace("-", (" " + SUB.getCharacter()) + " ");
+                s = s.replace("[", (" " + OPEN_BRACKET.getCharacter()) + " ");
+                s = s.replace("]", (" " + CLOSE_BRACKET.getCharacter()) + " ");
+                s = s.replace("~", (" " + TILDE.getCharacter()) + " ");
+                s = s.trim();
+            }
+            stringJoiner.add(s);
+        }
+        return stringJoiner.toString();
     }
 
     public static String FindTokenType(String token) {

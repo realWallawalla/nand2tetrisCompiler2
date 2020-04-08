@@ -9,16 +9,11 @@ import com.timonsarakinis.tokens.types.StatementType;
 import com.timonsarakinis.tokens.types.SymbolType;
 import com.timonsarakinis.tokens.types.TokenType;
 import com.timonsarakinis.vmwriter.JackVmWriter;
-import com.timonsarakinis.vmwriter.VmSegmentType;
 import com.timonsarakinis.vmwriter.VmWriter;
 import org.apache.commons.lang3.StringUtils;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.stream.Stream;
-
-import static com.timonsarakinis.tokens.types.KeywordType.*;
 import static com.timonsarakinis.tokens.types.KeywordType.THIS;
+import static com.timonsarakinis.tokens.types.KeywordType.*;
 import static com.timonsarakinis.tokens.types.SymbolType.*;
 import static com.timonsarakinis.utils.EngineUtils.*;
 import static com.timonsarakinis.vmwriter.VmSegmentType.*;
@@ -367,7 +362,7 @@ public class JackCompilationEngine implements Engine {
     }
 
     private void compileTerm() {
-        if (isTermConstant(tokenizer.getCurrentToken())) {
+        if (tokenizer.getCurrentToken().getTokenType() == TokenType.INT_CONST) {
             vmWriter.writePush(CONST.getSegment(), Integer.parseInt(getCurrentTokenValue()));
             advance();
         } else if (tokenizer.getCurrentToken().getTokenType() == TokenType.STRING_CONST) {
@@ -386,7 +381,10 @@ public class JackCompilationEngine implements Engine {
         } else if (StringUtils.equals(getCurrentTokenValue(), FALSE.getValue())) {
             vmWriter.writePush(CONST.getSegment(), 0);
             advance();
-        } else if (StringUtils.equals(getCurrentTokenValue(), THIS.getValue())) {
+        }  else if (StringUtils.equals(getCurrentTokenValue(), NULL.getValue())) {
+            vmWriter.writePush(CONST.getSegment(), 0);
+            advance();
+        }  else if (StringUtils.equals(getCurrentTokenValue(), THIS.getValue())) {
             vmWriter.writePush(POINTER.getSegment(), 0);
             advance();
         } else if (isIdentifier(getCurrentTokenValue())) {
