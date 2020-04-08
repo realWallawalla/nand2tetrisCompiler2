@@ -21,9 +21,7 @@ public class EngineUtils {
     }
 
     public static boolean isTermConstant(Token token) {
-        return token.getTokenType() == TokenType.INT_CONST
-                || token.getTokenType() == TokenType.STRING_CONST
-                || StringUtils.equals(token.getValue(), NULL.getValue());
+        return token.getTokenType() == TokenType.INT_CONST || StringUtils.equals(token.getValue(), NULL.getValue());
     }
 
     public static boolean isCurrentTokenSubroutine(String token) {

@@ -7,10 +7,15 @@ import com.timonsarakinis.tokens.Token;
 import com.timonsarakinis.tokens.types.KeywordType;
 import com.timonsarakinis.tokens.types.StatementType;
 import com.timonsarakinis.tokens.types.SymbolType;
+import com.timonsarakinis.tokens.types.TokenType;
 import com.timonsarakinis.vmwriter.JackVmWriter;
 import com.timonsarakinis.vmwriter.VmSegmentType;
 import com.timonsarakinis.vmwriter.VmWriter;
 import org.apache.commons.lang3.StringUtils;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 import static com.timonsarakinis.tokens.types.KeywordType.*;
 import static com.timonsarakinis.tokens.types.KeywordType.THIS;
@@ -279,6 +284,8 @@ public class JackCompilationEngine implements Engine {
                 vmWriter.writePush(segment, index);
                 identifier = object;
             }
+        } else if (tokenizer.getCurrentToken().getTokenType() == TokenType.STRING_CONST) {
+            vmWriter.writeCall("String.new", 1);
         }
 
         if (isCurrentTokenEqualTo(DOT.getCharacter())) {
@@ -293,10 +300,10 @@ public class JackCompilationEngine implements Engine {
             requireSymbol((CLOSE_PARENTHESIS.getCharacter()));
         }
 
-        if (functionName.isEmpty()) {
+        if (functionName.isEmpty() && !identifier.isEmpty()) {
             vmWriter.writePush(POINTER.getSegment(), 0); //push object on stack. this.
             vmWriter.writeCall(getFunctionNameCall(identifier), 1); // call method on object.
-        } else {
+        } else if (!functionName.isEmpty()) {
             nArgs = object.isEmpty() ? nArgs : nArgs + 1; //if method call on object then object should be passed in the call.
             vmWriter.writeCall(identifier + DOT.getCharacter() + functionName, nArgs);
         }
@@ -306,15 +313,27 @@ public class JackCompilationEngine implements Engine {
         requireSymbol(KeywordType.LET.getValue());
         String varName = getCurrentTokenValue();
         eatAndAdvance(isIdentifier(varName));
-        if (isCurrentTokenEqualTo(OPEN_BRACKET.getCharacter())) {
+        boolean isArray = isCurrentTokenEqualTo(OPEN_BRACKET.getCharacter());
+        if (isArray) {
+            vmWriter.writePush(symbolTable.kindOf(varName), symbolTable.indexOf(varName));
+
             requireSymbol(OPEN_BRACKET.getCharacter());
             compileExpression();
             requireSymbol(CLOSE_BRACKET.getCharacter());
+
+            vmWriter.writeArithmatic(ArithmaticType.ADD);
         }
         requireSymbol(EQUALS.getCharacter());
         compileExpression();
         requireSymbol(SEMICOLON.getCharacter());
-        vmWriter.writePop(symbolTable.kindOf(varName), symbolTable.indexOf(varName));
+        if (isArray) {
+            vmWriter.writePop(TEMP.getSegment(), 0);
+            vmWriter.writePop(POINTER.getSegment(), 1);
+            vmWriter.writePush(TEMP.getSegment(), 0);
+            vmWriter.writePop(THAT.getSegment(), 0);
+        } else {
+            vmWriter.writePop(symbolTable.kindOf(varName), symbolTable.indexOf(varName));
+        }
     }
 
     private void compileReturn() {
@@ -350,6 +369,15 @@ public class JackCompilationEngine implements Engine {
     private void compileTerm() {
         if (isTermConstant(tokenizer.getCurrentToken())) {
             vmWriter.writePush(CONST.getSegment(), Integer.parseInt(getCurrentTokenValue()));
+            advance();
+        } else if (tokenizer.getCurrentToken().getTokenType() == TokenType.STRING_CONST) {
+            char[] chars = getCurrentTokenValue().toCharArray();
+            vmWriter.writePush(CONST.getSegment(), chars.length);
+            compileSubroutineCall("");
+            for (char character: chars) {
+                vmWriter.writePush(CONST.getSegment(), (int) character); // push ascii code
+                vmWriter.writeCall("String.appendChar", 2);
+            }
             advance();
         } else if (StringUtils.equals(getCurrentTokenValue(), TRUE.getValue())) {
             vmWriter.writePush(CONST.getSegment(), 0); //evrything that is not zero is true.
@@ -394,9 +422,16 @@ public class JackCompilationEngine implements Engine {
         String identifier = getCurrentTokenValue();
         advance();
         if (isCurrentTokenEqualTo(OPEN_BRACKET.getCharacter())) {
+            vmWriter.writePush(symbolTable.kindOf(identifier), symbolTable.indexOf(identifier));
+
             requireSymbol(OPEN_BRACKET.getCharacter());
             compileExpression();
             requireSymbol(CLOSE_BRACKET.getCharacter());
+
+            vmWriter.writeArithmatic(ArithmaticType.ADD);
+            vmWriter.writePop(POINTER.getSegment(), 1); // pop/anchor base-address of array and index into that
+            vmWriter.writePush(THAT.getSegment(), 0);
+
         } else if (isCurrentTokenEqualTo(DOT.getCharacter())) {
             compileSubroutineCall(identifier);
         } else {
