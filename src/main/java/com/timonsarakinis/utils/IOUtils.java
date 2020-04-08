@@ -16,7 +16,7 @@ import static java.nio.file.StandardOpenOption.CREATE;
 public class IOUtils {
     public static final String DIR_PATH = "src/main/resources/output/";
     public static final int FALSE = -1;
-    public static final String FILE_EXTENSION = ".xml";
+    public static final String FILE_EXTENSION = ".vm";
 
     public static List<Path> getPaths(String path) {
         List<Path> filePaths = new ArrayList<>();

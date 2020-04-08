@@ -1,5 +1,6 @@
 package com.timonsarakinis.vmwriter;
 
+import com.timonsarakinis.engine.ArithmaticType;
 import com.timonsarakinis.utils.IOUtils;
 
 public class JackVmWriter implements VmWriter {
@@ -10,48 +11,48 @@ public class JackVmWriter implements VmWriter {
     }
 
     @Override
-    public void writePush(VmSegmentType segment, int value) {
-        writeTofile(("push " + segment.toString().toLowerCase() + " " + value).getBytes());
+    public void writePush(String segment, int value) {
+        writeTofile(("push " + segment.toLowerCase() + " " + value + System.lineSeparator()).getBytes());
     }
 
     @Override
-    public void writePop(VmSegmentType segment, int value) {
-        writeTofile(("pop " + segment.toString().toLowerCase() + " " + value).getBytes());
+    public void writePop(String segment, int value) {
+        writeTofile(("pop " + segment.toLowerCase() + " " + value + System.lineSeparator()).getBytes());
     }
 
     @Override
-    public void writeArithmatic(ArithmeticType arithmetic) {
-        writeTofile(arithmetic.toString().toLowerCase().getBytes());
+    public void writeArithmatic(ArithmaticType arithmetic) {
+        writeTofile((arithmetic.getVmValue() + System.lineSeparator()).getBytes());
     }
 
     @Override
     public void writeLabel(String label) {
-        writeTofile(("label " + label).getBytes());
+        writeTofile(("label " + label + System.lineSeparator()).getBytes());
     }
 
     @Override
     public void writeGoto(String label) {
-        writeTofile(("goto " + label).getBytes());
+        writeTofile(("goto " + label + System.lineSeparator()).getBytes());
     }
 
     @Override
     public void writeIf(String label) {
-        writeTofile(("if goto " + label).getBytes());
+        writeTofile(("if-goto " + label + System.lineSeparator()).getBytes());
     }
 
     @Override
     public void writeCall(String name, int nArgs) {
-        writeTofile(("call " + name + " " + nArgs).getBytes());
+        writeTofile(("call " + name + " " + nArgs + System.lineSeparator()).getBytes());
     }
 
     @Override
     public void writeFunction(String name, int nLocals) {
-        writeTofile(("function " + name + " " + nLocals).getBytes());
+        writeTofile(("function " + name + " " + nLocals + System.lineSeparator()).getBytes());
     }
 
     @Override
     public void writeReturn() {
-        writeTofile(("return").getBytes());
+        writeTofile(("return" + System.lineSeparator()).getBytes());
     }
 
     private void writeTofile(byte[] command) {

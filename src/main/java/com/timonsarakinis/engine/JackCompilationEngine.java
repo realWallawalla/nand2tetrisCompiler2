@@ -1,19 +1,22 @@
 package com.timonsarakinis.engine;
 
+import com.timonsarakinis.symboltable.IdentifierType;
+import com.timonsarakinis.symboltable.SymbolTable;
 import com.timonsarakinis.tokenizer.Tokenizer;
-import com.timonsarakinis.tokens.NonTerminalToken;
 import com.timonsarakinis.tokens.Token;
-import com.timonsarakinis.tokens.types.*;
-import com.timonsarakinis.utils.EngineUtils;
-import com.timonsarakinis.utils.IOUtils;
+import com.timonsarakinis.tokens.types.KeywordType;
+import com.timonsarakinis.tokens.types.StatementType;
+import com.timonsarakinis.tokens.types.SymbolType;
+import com.timonsarakinis.vmwriter.JackVmWriter;
+import com.timonsarakinis.vmwriter.VmSegmentType;
+import com.timonsarakinis.vmwriter.VmWriter;
 import org.apache.commons.lang3.StringUtils;
 
 import static com.timonsarakinis.tokens.types.KeywordType.*;
-import static com.timonsarakinis.tokens.types.NonTerminalType.*;
+import static com.timonsarakinis.tokens.types.KeywordType.THIS;
 import static com.timonsarakinis.tokens.types.SymbolType.*;
 import static com.timonsarakinis.utils.EngineUtils.*;
-import static com.timonsarakinis.utils.TokenUtils.prepareNonTerminalForOutPut;
-import static com.timonsarakinis.utils.TokenUtils.prepareTerminalForOutPut;
+import static com.timonsarakinis.vmwriter.VmSegmentType.*;
 import static org.apache.commons.lang3.EnumUtils.getEnumIgnoreCase;
 import static org.apache.commons.lang3.EnumUtils.isValidEnumIgnoreCase;
 
@@ -21,6 +24,13 @@ public class JackCompilationEngine implements Engine {
 
     private Tokenizer tokenizer;
     private final String fileName;
+    private SymbolTable symbolTable;
+    private VmWriter vmWriter;
+    private String className;
+    private int nArgs;
+    private int whileCounter;
+    private int ifCounter;
+    private String methodKind;
 
     public JackCompilationEngine(Tokenizer tokenizer, String fileName) {
         this.tokenizer = tokenizer;
@@ -30,108 +40,141 @@ public class JackCompilationEngine implements Engine {
     @Override
     public void compile() {
         if (tokenizer.hasMoreTokens()) {
-            tokenizer.advance();
             //according to contract file has to start with class.
+            symbolTable = new SymbolTable();
+            vmWriter = new JackVmWriter(fileName);
             compileClass();
         }
     }
 
     private void compileClass() {
-        writeNonTerminalToFile(NonTerminalType.CLASS, true);
-        eatAndAdvance(KeywordType.CLASS.getValue());
-        eatAndAdvance(isIdentifier(getCurrentTokenValue()));
-        eatAndAdvance(OPEN_BRACE.getCharacter());
+        tokenizer.advance();
+        requireSymbol(CLASS.getValue());
+        className = getCurrentTokenValue();
+        eatAndAdvance(isIdentifier(className));
+        requireSymbol(OPEN_BRACE.getCharacter());
 
-        while (EngineUtils.isCurrentTokenClassVar(getCurrentTokenValue())) {
+        while (isCurrentTokenClassVar(getCurrentTokenValue())) {
             compileClassVarDeclaration();
         }
 
-        while (EngineUtils.isCurrentTokenSubroutine(getCurrentTokenValue())) {
+        while (isCurrentTokenSubroutine(getCurrentTokenValue())) {
             compileSubroutineDeclaration();
         }
-        eatAndAdvance(CLOSE_BRACE.getCharacter());
-        writeNonTerminalToFile(NonTerminalType.CLASS, false);
+        requireSymbol(CLOSE_BRACE.getCharacter());
     }
 
     private void compileClassVarDeclaration() {
-        writeNonTerminalToFile(CLASS_VAR_DEC, true);
-        eatAndAdvance(isCurrentTokenEqualTo(FIELD.getValue()) || isCurrentTokenEqualTo(STATIC.getValue()));
+        Token kind = tokenizer.getCurrentToken();
+        advance();
 
+        Token type = tokenizer.getCurrentToken();
         eatAndAdvance(isType(getCurrentTokenValue()));
+
+        Token name = tokenizer.getCurrentToken();
         eatAndAdvance(isIdentifier(getCurrentTokenValue()));
 
+        symbolTable.define(name.getValue(), type.getValue(), kind.getValue());
         while (isCurrentTokenEqualTo(COMMA.getCharacter())) {
-            eatAndAdvance(COMMA.getCharacter());
+            advance();
+            symbolTable.define(getCurrentTokenValue(), type.getValue(), kind.getValue());
             eatAndAdvance(isIdentifier(getCurrentTokenValue()));
         }
-        eatAndAdvance(SEMICOLON.getCharacter());
-        writeNonTerminalToFile(CLASS_VAR_DEC, false);
+        requireSymbol(SEMICOLON.getCharacter());
     }
 
     private void compileSubroutineDeclaration() {
-        writeNonTerminalToFile(SUBROUTINE_DEC, true);
-        eatAndAdvance(EngineUtils.isCurrentTokenSubroutine(getCurrentTokenValue()));
+        symbolTable.startSubRoutine();
+        methodKind = getCurrentTokenValue();
+        eatAndAdvance(isCurrentTokenSubroutine(methodKind));
+
         eatAndAdvance(isType(getCurrentTokenValue()) || isCurrentTokenEqualTo(VOID.getValue()));
-        eatAndAdvance(isIdentifier(getCurrentTokenValue()));
 
-        eatAndAdvance(OPEN_PARENTHESIS.getCharacter());
-        compileParameterList();
-        eatAndAdvance(CLOSE_PARENTHESIS.getCharacter());
+        String functionName = getCurrentTokenValue();
+        eatAndAdvance(isIdentifier(functionName));
 
-        compileSubroutineBody();
-        writeNonTerminalToFile(SUBROUTINE_DEC, false);
-    }
-
-    private void compileParameterList() {
-        writeNonTerminalToFile(PARAMETER_LIST, true);
-        eatAndAdvance(isType(getCurrentTokenValue()));
-        eatAndAdvance(isIdentifier(getCurrentTokenValue()));
-
-        while (isCurrentTokenEqualTo(COMMA.getCharacter())) {
-            eatAndAdvance(COMMA.getCharacter());
-            eatAndAdvance(isType(getCurrentTokenValue()));
-            eatAndAdvance(isIdentifier(getCurrentTokenValue()));
+        requireSymbol(OPEN_PARENTHESIS.getCharacter());
+        if (!isCurrentTokenEqualTo(CLOSE_PARENTHESIS.getCharacter())) {
+            compileParameterList();
         }
+        requireSymbol(CLOSE_PARENTHESIS.getCharacter());
+        requireSymbol(OPEN_BRACE.getCharacter());
 
-        writeNonTerminalToFile(PARAMETER_LIST, false);
-    }
-
-    private void compileSubroutineBody() {
-        writeNonTerminalToFile(SUBROUTINE_BODY, true);
-        eatAndAdvance(OPEN_BRACE.getCharacter());
         while (isCurrentTokenEqualTo(VAR.getValue())) {
             compileVarDeclaration();
         }
 
-        writeNonTerminalToFile(STATEMENTS, true);
+        vmWriter.writeFunction(getFunctionNameCall(functionName), symbolTable.varCount(IdentifierType.LOCAL));
+
+        if (StringUtils.equals(methodKind, CONSTRUCTOR.getValue())) {
+            vmWriter.writePush(CONST.getSegment(), symbolTable.varCount(IdentifierType.FIELD));
+            vmWriter.writeCall("Memory.alloc", 1); //allocate memory for object. os function. return base address.
+            vmWriter.writePop(POINTER.getSegment(), 0); //anchor base address to this
+        } else if (StringUtils.equals(methodKind, METHOD.getValue())) {
+            vmWriter.writePush(ARG.getSegment(), 0); //arg 0 is this in method
+            vmWriter.writePop(POINTER.getSegment(), 0); //ancor this base address
+        }
+        compileSubroutineBody();
+    }
+
+    private String getFunctionNameCall(String identifier) {
+        return className + "." + identifier;
+    }
+
+    private void compileParameterList() {
+        Token type = tokenizer.getCurrentToken();
+        eatAndAdvance(isType(type.getValue()));
+
+        Token name = tokenizer.getCurrentToken();
+        eatAndAdvance(isIdentifier(name.getValue()));
+
+        symbolTable.define(name.getValue(), type.getValue(), ARG.getSegment());
+
+        while (isCurrentTokenEqualTo(COMMA.getCharacter())) {
+            advance();
+            Token nextType = tokenizer.getCurrentToken();
+            advance();
+            Token nextName = tokenizer.getCurrentToken();
+            advance();
+            symbolTable.define(nextName.getValue(), nextType.getValue(), ARG.getSegment());
+        }
+    }
+
+    private void compileSubroutineBody() {
         while (isValidEnumIgnoreCase(StatementType.class, getCurrentTokenValue())) {
             compileStatements();
         }
-        writeNonTerminalToFile(STATEMENTS, false);
 
-        eatAndAdvance(CLOSE_BRACE.getCharacter());
-        writeNonTerminalToFile(SUBROUTINE_BODY, false);
+        requireSymbol(CLOSE_BRACE.getCharacter());
     }
 
     private void compileVarDeclaration() {
-        writeNonTerminalToFile(VAR_DEC, true);
-        eatAndAdvance(VAR.getValue());
-        eatAndAdvance(isType(getCurrentTokenValue()));
-        eatAndAdvance(isIdentifier(getCurrentTokenValue()));
+        requireSymbol(VAR.getValue());
+        String type = getCurrentTokenValue();
+        eatAndAdvance(isType(type));
+
+        String name = getCurrentTokenValue();
+        eatAndAdvance(isIdentifier(name));
+
+        symbolTable.define(name, type, LOCAL.getSegment());
         while (isCurrentTokenEqualTo(COMMA.getCharacter())) {
-            eatAndAdvance(COMMA.getCharacter());
-            eatAndAdvance(isIdentifier(getCurrentTokenValue()));
+            advance();
+            String nextName = getCurrentTokenValue();
+            eatAndAdvance(isIdentifier(name));
+
+            symbolTable.define(nextName, type, LOCAL.getSegment());
         }
-        eatAndAdvance(SEMICOLON.getCharacter());
-        writeNonTerminalToFile(VAR_DEC, false);
+        requireSymbol(SEMICOLON.getCharacter());
     }
 
     private void compileStatements() {
         switch (getEnumIgnoreCase(StatementType.class, getCurrentTokenValue())) {
             case IF:
+                ifCounter++;
                 compileIf();
                 break;
             case WHILE:
+                whileCounter++;
                 compileWhile();
                 break;
             case DO:
@@ -147,156 +190,217 @@ public class JackCompilationEngine implements Engine {
     }
 
     private void compileIf() {
-        writeNonTerminalToFile(StatementType.IF, true);
-        eatAndAdvance(KeywordType.IF.getValue());
-        eatAndAdvance(OPEN_PARENTHESIS.getCharacter());
-        compileExpression();
-        eatAndAdvance(CLOSE_PARENTHESIS.getCharacter());
-        eatAndAdvance(OPEN_BRACE.getCharacter());
+        String trueLabel = TRUE.toString() + ifCounter;
+        String falseLabel = FALSE.toString() + ifCounter;
+        String elseLabel = ELSE.toString() + ifCounter;
 
-        writeNonTerminalToFile(STATEMENTS, true);
+        requireSymbol(KeywordType.IF.getValue());
+        requireSymbol(OPEN_PARENTHESIS.getCharacter());
+        compileExpression();
+        requireSymbol(CLOSE_PARENTHESIS.getCharacter());
+        requireSymbol(OPEN_BRACE.getCharacter());
+
+        vmWriter.writeIf(trueLabel);
+        vmWriter.writeGoto(falseLabel);
+        vmWriter.writeLabel(trueLabel); //if true continue else skip
         while (isValidEnumIgnoreCase(StatementType.class, getCurrentTokenValue())) {
             compileStatements();
         }
-        writeNonTerminalToFile(STATEMENTS, false);
 
-        eatAndAdvance(CLOSE_BRACE.getCharacter());
+        requireSymbol(CLOSE_BRACE.getCharacter());
+
+        if (isCurrentTokenEqualTo(ELSE.getValue())) {
+            vmWriter.writeGoto(elseLabel); //go to else end if you have done the if statement.
+        }
+        vmWriter.writeLabel(falseLabel);
         if (isCurrentTokenEqualTo(ELSE.getValue())) {
             compileElse();
+            vmWriter.writeLabel(elseLabel);
         }
-        writeNonTerminalToFile(StatementType.IF, false);
     }
 
     private void compileElse() {
-        eatAndAdvance(ELSE.getValue());
-        eatAndAdvance(OPEN_BRACE.getCharacter());
+        requireSymbol(ELSE.getValue());
+        requireSymbol(OPEN_BRACE.getCharacter());
 
-        writeNonTerminalToFile(STATEMENTS, true);
         while (isValidEnumIgnoreCase(StatementType.class, getCurrentTokenValue())) {
             compileStatements();
         }
-        writeNonTerminalToFile(STATEMENTS, false);
 
-        eatAndAdvance(CLOSE_BRACE.getCharacter());
+        requireSymbol(CLOSE_BRACE.getCharacter());
     }
 
     private void compileWhile() {
-        writeNonTerminalToFile(StatementType.WHILE, true);
-        eatAndAdvance(KeywordType.WHILE.getValue());
-        eatAndAdvance(OPEN_PARENTHESIS.getCharacter());
-        compileExpression();
-        eatAndAdvance(CLOSE_PARENTHESIS.getCharacter());
-        eatAndAdvance(OPEN_BRACE.getCharacter());
+        String whileLabel = WHILE.toString() + "_" + whileCounter;
+        String whileEndLabel = WHILE.toString() + "_END_" + whileCounter;
 
-        writeNonTerminalToFile(STATEMENTS, true);
+        requireSymbol(KeywordType.WHILE.getValue());
+        requireSymbol(OPEN_PARENTHESIS.getCharacter());
+        vmWriter.writeLabel(whileLabel);
+        compileExpression();
+        vmWriter.writeArithmatic(ArithmaticType.NOT); // not true go to end whileloop
+        vmWriter.writeIf(whileEndLabel);
+        requireSymbol(CLOSE_PARENTHESIS.getCharacter());
+        requireSymbol(OPEN_BRACE.getCharacter());
+
         while (isValidEnumIgnoreCase(StatementType.class, getCurrentTokenValue())) {
             compileStatements();
         }
-        writeNonTerminalToFile(STATEMENTS, false);
 
-        eatAndAdvance(CLOSE_BRACE.getCharacter());
-        writeNonTerminalToFile(StatementType.WHILE, false);
+        requireSymbol(CLOSE_BRACE.getCharacter());
+        vmWriter.writeGoto(whileLabel);
+        vmWriter.writeLabel(whileEndLabel);
     }
 
     private void compileDo() {
-        writeNonTerminalToFile(StatementType.DO, true);
-        eatAndAdvance(KeywordType.DO.getValue());
-        eatAndAdvance(isIdentifier(getCurrentTokenValue()));
-        compileSubroutineCall();
-        eatAndAdvance(SEMICOLON.getCharacter());
-        writeNonTerminalToFile(StatementType.DO, false);
+        requireSymbol(KeywordType.DO.getValue());
+        compileSubroutineCall(getCurrentTokenValue());
+        requireSymbol(SEMICOLON.getCharacter());
+
+        //pop dummy value from stack. by contract void methods will return zero
+        vmWriter.writePop(TEMP.getSegment(),0);
     }
 
-    private void compileSubroutineCall() {
-        if (getCurrentTokenValue().contains(DOT.getCharacter())) {
-            eatAndAdvance(DOT.getCharacter());
-            eatAndAdvance(isIdentifier(getCurrentTokenValue()));
+    private void compileSubroutineCall(String identifier) {
+        String segment = symbolTable.kindOf(identifier);
+        String object = symbolTable.typeOf(identifier);
+        int index = symbolTable.indexOf(identifier);
+        String functionName = "";
+
+        if (isIdentifier(getCurrentTokenValue())) {
+            identifier = getCurrentTokenValue();
+            advance();
+            if (isCurrentTokenEqualTo(DOT.getCharacter())) {
+                advance();
+                functionName = getCurrentTokenValue();
+                eatAndAdvance(isIdentifier(functionName));
+            }
+            if (!object.isEmpty()) {
+                vmWriter.writePush(segment, index);
+                identifier = object;
+            }
         }
-        eatAndAdvance(OPEN_PARENTHESIS.getCharacter());
-        compileExpressionList();
-        eatAndAdvance(CLOSE_PARENTHESIS.getCharacter());
+
+        if (isCurrentTokenEqualTo(DOT.getCharacter())) {
+            advance();
+            functionName = getCurrentTokenValue();
+            eatAndAdvance(isIdentifier(functionName));
+        }
+
+        if (isCurrentTokenEqualTo(OPEN_PARENTHESIS.getCharacter())) {
+            advance();
+            compileExpressionList();
+            requireSymbol((CLOSE_PARENTHESIS.getCharacter()));
+        }
+
+        if (functionName.isEmpty()) {
+            vmWriter.writePush(POINTER.getSegment(), 0); //push object on stack. this.
+            vmWriter.writeCall(getFunctionNameCall(identifier), 1); // call method on object.
+        } else {
+            nArgs = object.isEmpty() ? nArgs : nArgs + 1; //if method call on object then object should be passed in the call.
+            vmWriter.writeCall(identifier + DOT.getCharacter() + functionName, nArgs);
+        }
     }
 
     private void compileLet() {
-        writeNonTerminalToFile(StatementType.LET, true);
-        eatAndAdvance(KeywordType.LET.getValue());
-        eatAndAdvance(isIdentifier(getCurrentTokenValue()));
+        requireSymbol(KeywordType.LET.getValue());
+        String varName = getCurrentTokenValue();
+        eatAndAdvance(isIdentifier(varName));
         if (isCurrentTokenEqualTo(OPEN_BRACKET.getCharacter())) {
-            eatAndAdvance(OPEN_BRACKET.getCharacter());
+            requireSymbol(OPEN_BRACKET.getCharacter());
             compileExpression();
-            eatAndAdvance(CLOSE_BRACKET.getCharacter());
+            requireSymbol(CLOSE_BRACKET.getCharacter());
         }
-        eatAndAdvance(EQUALS.getCharacter());
+        requireSymbol(EQUALS.getCharacter());
         compileExpression();
-        eatAndAdvance(SEMICOLON.getCharacter());
-        writeNonTerminalToFile(StatementType.LET, false);
+        requireSymbol(SEMICOLON.getCharacter());
+        vmWriter.writePop(symbolTable.kindOf(varName), symbolTable.indexOf(varName));
     }
 
     private void compileReturn() {
-        writeNonTerminalToFile(StatementType.RETURN, true);
-        eatAndAdvance(RETURN.getValue());
+        requireSymbol(RETURN.getValue());
         if (!getCurrentTokenValue().equals(SEMICOLON.getCharacter())) {
             compileExpression();
+        } else {
+            //have to return something. Push zero by contract
+            vmWriter.writePush(CONST.getSegment(), 0);
         }
-        eatAndAdvance(SEMICOLON.getCharacter());
-        writeNonTerminalToFile(StatementType.RETURN, false);
+        vmWriter.writeReturn();
+        requireSymbol(SEMICOLON.getCharacter());
     }
 
     private void compileExpressionList() {
-        writeNonTerminalToFile(EXPRESSION_LIST, true);
+        nArgs = 0;
+        //if closing parenthis no args
         if (!isCurrentTokenEqualTo(CLOSE_PARENTHESIS.getCharacter())) {
+            nArgs++;
             compileExpression();
         }
-        writeNonTerminalToFile(EXPRESSION_LIST, false);
     }
 
     private void compileExpression() {
-        writeNonTerminalToFile(EXPRESSION, true);
         compileTerm();
-        writeNonTerminalToFile(EXPRESSION, false);
-
         if (isCurrentTokenEqualTo(COMMA.getCharacter())) {
-            eatAndAdvance(COMMA.getCharacter());
+            requireSymbol(COMMA.getCharacter());
+            nArgs++;
             compileExpression();
         }
-
-        eatAndAdvance(SEMICOLON.getCharacter());
     }
 
     private void compileTerm() {
-        writeNonTerminalToFile(TERM, true);
-        eatAndAdvance(isTermConstant(tokenizer.getCurrentToken()));
-        if (isIdentifier(getCurrentTokenValue())) {
+        if (isTermConstant(tokenizer.getCurrentToken())) {
+            vmWriter.writePush(CONST.getSegment(), Integer.parseInt(getCurrentTokenValue()));
+            advance();
+        } else if (StringUtils.equals(getCurrentTokenValue(), TRUE.getValue())) {
+            vmWriter.writePush(CONST.getSegment(), 0); //evrything that is not zero is true.
+            vmWriter.writeArithmatic(ArithmaticType.NOT);
+            advance();
+        } else if (StringUtils.equals(getCurrentTokenValue(), FALSE.getValue())) {
+            vmWriter.writePush(CONST.getSegment(), 0);
+            advance();
+        } else if (StringUtils.equals(getCurrentTokenValue(), THIS.getValue())) {
+            vmWriter.writePush(POINTER.getSegment(), 0);
+            advance();
+        } else if (isIdentifier(getCurrentTokenValue())) {
             lookAhead();
         } else if (isCurrentTokenEqualTo(OPEN_PARENTHESIS.getCharacter())) {
-            eatAndAdvance(true);
+            advance();
             compileExpression();
-            eatAndAdvance(isCurrentTokenEqualTo(CLOSE_PARENTHESIS.getCharacter()));
-        } else if (isCurrentTokenEqualTo(HIPHON.getCharacter()) || isCurrentTokenEqualTo(TILDE.getCharacter())) {
-            eatAndAdvance(true);
+            requireSymbol(CLOSE_PARENTHESIS.getCharacter());
+        } else if (isCurrentTokenEqualTo(SUB.getCharacter())) {
+            advance();
             compileTerm();
+            vmWriter.writeArithmatic(ArithmaticType.NEG);
+        } else if (isCurrentTokenEqualTo(TILDE.getCharacter())) {
+            advance();
+            compileTerm();
+            vmWriter.writeArithmatic(ArithmaticType.NOT);
         }
-        writeNonTerminalToFile(TERM, false);
-
         if (isOp()) {
-            eatAndAdvance(true);
-            compileTerm();
+            String op = getCurrentTokenValue();
+            advance();
+            if (op.equals(MULTIPLY.getCharacter()) || op.equals(DIVIDE.getCharacter())) {
+                //always 2 args- jack does not support multiply. uses os function
+                compileTerm();
+                vmWriter.writeCall(ArithmaticType.mappings.get(op).getVmValue(), 2);
+            } else {
+                compileTerm();
+                vmWriter.writeArithmatic(ArithmaticType.mappings.get(op));
+            }
         }
     }
 
     private void lookAhead() {
-        Token identifier = tokenizer.getCurrentToken();
+        String identifier = getCurrentTokenValue();
         advance();
         if (isCurrentTokenEqualTo(OPEN_BRACKET.getCharacter())) {
-            writeToFile(prepareTerminalForOutPut(identifier));
-            eatAndAdvance(OPEN_BRACKET.getCharacter());
+            requireSymbol(OPEN_BRACKET.getCharacter());
             compileExpression();
-            eatAndAdvance(CLOSE_BRACKET.getCharacter());
+            requireSymbol(CLOSE_BRACKET.getCharacter());
         } else if (isCurrentTokenEqualTo(DOT.getCharacter())) {
-            writeToFile(prepareTerminalForOutPut(identifier));
-            compileSubroutineCall();
+            compileSubroutineCall(identifier);
         } else {
-            writeToFile(prepareTerminalForOutPut(identifier));
+            vmWriter.writePush(symbolTable.kindOf(identifier), symbolTable.indexOf(identifier));
         }
     }
 
@@ -304,23 +408,20 @@ public class JackCompilationEngine implements Engine {
         return SymbolType.getOperators().stream().anyMatch(symbolType -> isCurrentTokenEqualTo(symbolType.getCharacter()));
     }
 
-    private void eatAndAdvance(String value) {
-        Token currentToken = tokenizer.getCurrentToken();
+    private void requireSymbol(String value) {
         if (isCurrentTokenEqualTo(value)) {
-            writeToFile(prepareTerminalForOutPut(currentToken));
             advance();
         } else {
-            printError(currentToken);
+            error(value);
         }
     }
 
     private void eatAndAdvance(boolean eat) {
         Token currentToken = tokenizer.getCurrentToken();
         if (eat) {
-            writeToFile(prepareTerminalForOutPut(currentToken));
             advance();
         } else {
-            printError(currentToken);
+            error(currentToken.getValue());
         }
     }
 
@@ -330,17 +431,10 @@ public class JackCompilationEngine implements Engine {
         }
     }
 
-    private void writeNonTerminalToFile(NonTerminalToken token, boolean open) {
-        writeToFile(prepareNonTerminalForOutPut(token, open));
+    private void error(String value) {
+        throw new IllegalStateException("Expected value: " + value + " was: " + tokenizer.getCurrentToken().getValue());
     }
 
-    private void writeToFile(byte[] xml) {
-        IOUtils.writeToFile(xml, fileName);
-    }
-
-    private void printError(Token currentToken) {
-        System.out.printf("did not match with: %s continue \n", currentToken.getValue());
-    }
     private boolean isCurrentTokenEqualTo(String value) {
         return StringUtils.equals(getCurrentTokenValue(), value);
     }

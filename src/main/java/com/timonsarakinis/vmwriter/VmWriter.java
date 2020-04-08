@@ -1,11 +1,13 @@
 package com.timonsarakinis.vmwriter;
 
+import com.timonsarakinis.engine.ArithmaticType;
+
 public interface VmWriter {
-    void writePush(VmSegmentType segment, int value);
+    void writePush(String segment, int value);
 
-    void writePop(VmSegmentType segment, int value);
+    void writePop(String segment, int value);
 
-    void writeArithmatic(ArithmeticType arithmetic);
+    void writeArithmatic(ArithmaticType arithmetic);
 
     void writeLabel(String label);
 

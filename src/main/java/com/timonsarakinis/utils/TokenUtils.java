@@ -1,12 +1,9 @@
 package com.timonsarakinis.utils;
 
-import com.timonsarakinis.tokens.NonTerminalToken;
-import com.timonsarakinis.tokens.Token;
 import com.timonsarakinis.tokens.types.KeywordType;
 import com.timonsarakinis.tokens.types.SymbolType;
 import org.apache.commons.lang3.StringUtils;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -59,7 +56,7 @@ public class TokenUtils {
                 .map(s -> s.replace(".", (" " + DOT.getCharacter()) + " "))
                 .map(s -> s.replace("<", (" " + LESS_THAN.getCharacter()) + " "))
                 .map(s -> s.replace(">", (" " + GREATER_THAN.getCharacter()) + " "))
-                .map(s -> s.replace("-", (" " + HIPHON.getCharacter()) + " "))
+                .map(s -> s.replace("-", (" " + SUB.getCharacter()) + " "))
                 .map(s -> s.replace("[", (" " + OPEN_BRACKET.getCharacter()) + " "))
                 .map(s -> s.replace("]", (" " + CLOSE_BRACKET.getCharacter()) + " "))
                 .map(s -> s.replace("~", (" " + TILDE.getCharacter()) + " "))

@@ -2,9 +2,7 @@ package com.timonsarakinis.tokens.types;
 
 import com.google.common.collect.Lists;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public enum SymbolType {
@@ -17,10 +15,10 @@ public enum SymbolType {
     DOT("."),
     COMMA(","),
     SEMICOLON(";"),
-    STAR("*"),
-    HIPHON("-"),
-    PLUS("+"),
-    SLASH("/"),
+    MULTIPLY("*"),
+    SUB("-"),
+    ADD("+"),
+    DIVIDE("/"),
     AMPERSAND("&amp;"),
     VERTICAL_BAR("|"),
     LESS_THAN("&lt;"),
@@ -43,6 +41,6 @@ public enum SymbolType {
     }
 
     public static List<SymbolType> getOperators() {
-        return Collections.unmodifiableList(Lists.newArrayList(PLUS, HIPHON, STAR, SLASH, AMPERSAND, VERTICAL_BAR, LESS_THAN, GREATER_THAN, EQUALS));
+        return Collections.unmodifiableList(Lists.newArrayList(ADD, SUB, MULTIPLY, DIVIDE, AMPERSAND, VERTICAL_BAR, LESS_THAN, GREATER_THAN, EQUALS));
     }
 }
