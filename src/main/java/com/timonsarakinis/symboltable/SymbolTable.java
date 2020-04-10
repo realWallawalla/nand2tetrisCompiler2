@@ -85,11 +85,7 @@ public class SymbolTable implements Table {
         return classTable.getOrDefault(key, functionTable.getOrDefault(key, null));
     }
 
-    public int getLocalCount() {
-        return functionTable.size();
-    }
-
-    public int getClassCount() {
-        return classTable.size();
+    public void incrementArgCounter() {
+        argCounter++;
     }
 }

@@ -86,6 +86,7 @@ public class JackCompilationEngine implements Engine {
     private void compileSubroutineDeclaration() {
         symbolTable.startSubRoutine();
         methodKind = getCurrentTokenValue();
+        boolean isMethod = StringUtils.equals(methodKind, METHOD.getValue());
         eatAndAdvance(isCurrentTokenSubroutine(methodKind));
 
         eatAndAdvance(isType(getCurrentTokenValue()) || isCurrentTokenEqualTo(VOID.getValue()));
@@ -94,6 +95,9 @@ public class JackCompilationEngine implements Engine {
         eatAndAdvance(isIdentifier(functionName));
 
         requireSymbol(OPEN_PARENTHESIS.getCharacter());
+        if (isMethod) {
+            symbolTable.incrementArgCounter();
+        }
         if (!isCurrentTokenEqualTo(CLOSE_PARENTHESIS.getCharacter())) {
             compileParameterList();
         }
@@ -104,21 +108,21 @@ public class JackCompilationEngine implements Engine {
             compileVarDeclaration();
         }
 
-        vmWriter.writeFunction(getFunctionNameCall(functionName), symbolTable.varCount(IdentifierType.LOCAL));
+        vmWriter.writeFunction(getFunctionCall(functionName), symbolTable.varCount(IdentifierType.LOCAL));
 
-        if (StringUtils.equals(methodKind, CONSTRUCTOR.getValue())) {
+       if (isMethod) {
+            vmWriter.writePush(ARG.getSegment(), 0); //arg 0 is this in method
+            vmWriter.writePop(POINTER.getSegment(), 0); //ancor this base address
+        } else if (StringUtils.equals(methodKind, CONSTRUCTOR.getValue())) {
             vmWriter.writePush(CONST.getSegment(), symbolTable.varCount(IdentifierType.FIELD));
             vmWriter.writeCall("Memory.alloc", 1); //allocate memory for object. os function. return base address.
             vmWriter.writePop(POINTER.getSegment(), 0); //anchor base address to this
-        } else if (StringUtils.equals(methodKind, METHOD.getValue())) {
-            vmWriter.writePush(ARG.getSegment(), 0); //arg 0 is this in method
-            vmWriter.writePop(POINTER.getSegment(), 0); //ancor this base address
         }
         compileSubroutineBody();
     }
 
-    private String getFunctionNameCall(String identifier) {
-        return className + "." + identifier;
+    private String getFunctionCall(String functionName) {
+        return className + "." + functionName;
     }
 
     private void compileParameterList() {
@@ -261,31 +265,35 @@ public class JackCompilationEngine implements Engine {
         vmWriter.writePop(TEMP.getSegment(),0);
     }
 
-    private void compileSubroutineCall(String identifier) {
-        String segment = symbolTable.kindOf(identifier);
-        String object = symbolTable.typeOf(identifier);
-        int index = symbolTable.indexOf(identifier);
+    private void compileSubroutineCall(String className) {
+        String segment = symbolTable.kindOf(className);
+        String object = symbolTable.typeOf(className);
+        int index = symbolTable.indexOf(className);
         String functionName = "";
 
-        if (isIdentifier(getCurrentTokenValue())) {
-            identifier = getCurrentTokenValue();
+        if (!object.isEmpty() && !isCurrentTokenEqualTo(DOT.getCharacter())) {
+            vmWriter.writePush(segment, index);
+            className = object;
+            functionName = getCurrentTokenValue();
+            eatAndAdvance(isIdentifier(functionName));
+        } else if (isIdentifier(getCurrentTokenValue()) && tokenizer.getCurrentToken().getTokenType() != TokenType.STRING_CONST) {
+            className = getCurrentTokenValue();
             advance();
             if (isCurrentTokenEqualTo(DOT.getCharacter())) {
                 advance();
                 functionName = getCurrentTokenValue();
                 eatAndAdvance(isIdentifier(functionName));
+            } else {
+                functionName = className;
+                className = "";
+                vmWriter.writePush(POINTER.getSegment(), 0); //push object on stack. this.
             }
-            if (!object.isEmpty()) {
-                vmWriter.writePush(segment, index);
-                identifier = object;
-            }
-        } else if (tokenizer.getCurrentToken().getTokenType() == TokenType.STRING_CONST) {
-            vmWriter.writeCall("String.new", 1);
         }
 
         if (isCurrentTokenEqualTo(DOT.getCharacter())) {
             advance();
             functionName = getCurrentTokenValue();
+            className = object.isEmpty() ? className : object;
             eatAndAdvance(isIdentifier(functionName));
         }
 
@@ -295,12 +303,16 @@ public class JackCompilationEngine implements Engine {
             requireSymbol((CLOSE_PARENTHESIS.getCharacter()));
         }
 
-        if (functionName.isEmpty() && !identifier.isEmpty()) {
-            vmWriter.writePush(POINTER.getSegment(), 0); //push object on stack. this.
-            vmWriter.writeCall(getFunctionNameCall(identifier), 1); // call method on object.
-        } else if (!functionName.isEmpty()) {
-            nArgs = object.isEmpty() ? nArgs : nArgs + 1; //if method call on object then object should be passed in the call.
-            vmWriter.writeCall(identifier + DOT.getCharacter() + functionName, nArgs);
+        if (!object.isEmpty()) {
+            nArgs++; //if method call on object then object should be passed in the call.
+            vmWriter.writeCall(className + DOT.getCharacter() + functionName, nArgs);
+        } else if (tokenizer.getCurrentToken().getTokenType() == TokenType.STRING_CONST) {
+            vmWriter.writeCall("String.new", 1);
+        } else if (className.isEmpty()) {
+            nArgs++;
+            vmWriter.writeCall(getFunctionCall(functionName), nArgs);
+        } else{
+            vmWriter.writeCall(className + DOT.getCharacter() + functionName, nArgs);
         }
     }
 
@@ -418,9 +430,12 @@ public class JackCompilationEngine implements Engine {
 
     private void lookAhead() {
         String identifier = getCurrentTokenValue();
+        String segment = symbolTable.kindOf(identifier);
+        int index = symbolTable.indexOf(identifier);
+
         advance();
         if (isCurrentTokenEqualTo(OPEN_BRACKET.getCharacter())) {
-            vmWriter.writePush(symbolTable.kindOf(identifier), symbolTable.indexOf(identifier));
+            vmWriter.writePush(segment, index);
 
             requireSymbol(OPEN_BRACKET.getCharacter());
             compileExpression();
@@ -431,9 +446,12 @@ public class JackCompilationEngine implements Engine {
             vmWriter.writePush(THAT.getSegment(), 0);
 
         } else if (isCurrentTokenEqualTo(DOT.getCharacter())) {
+            if (!segment.isEmpty()) {
+                vmWriter.writePush(segment, index);
+            }
             compileSubroutineCall(identifier);
         } else {
-            vmWriter.writePush(symbolTable.kindOf(identifier), symbolTable.indexOf(identifier));
+            vmWriter.writePush(segment, index);
         }
     }
 
